@@ -1,0 +1,13 @@
+model,task_type,reason,count
+qwen2.5-coder:7b,chain,tool_call_written_as_text,9
+qwen2.5-coder:7b,selection,tool_call_written_as_text,6
+qwen2.5-coder:7b,single,tool_call_written_as_text,12
+qwen3:1.7b,chain,no_tool_call,3
+qwen3:1.7b,chain,wrong_arguments,3
+qwen3:1.7b,chain,wrong_number_of_calls,3
+qwen3:1.7b,no_tool,unexpected_tool_call,3
+qwen3:1.7b,single,no_tool_call,3
+qwen3:4b,chain,no_tool_call,1
+qwen3:8b,chain,wrong_arguments,3
+qwen3:8b,chain,wrong_number_of_calls,3
+qwen3:8b,no_tool,unexpected_tool_call,3
