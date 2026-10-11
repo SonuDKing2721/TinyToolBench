@@ -166,3 +166,29 @@ I need to presen"
 qwen3:4b,s3,single,3,True,1,56.17,9.9,2325,"[{""name"": ""get_price"", ""args"": {""item"": ""keyboard""}}]","Okay, let me see. The user asked for the price of a keyboard. I called the get_price function with ""keyboard"" as the item. The response from the tool was 1500. So the price is $1500.
 
 I need to presen"
+qwen3:4b,s4,single,1,True,1,42.93,10.3,2325,"[{""name"": ""search_notes"", ""args"": {""keyword"": ""meeting""}}]","Okay, let me process this. The user asked to search their notes for 'meeting'. I called the search_notes function with the keyword 'meeting', and the response came back with ""Team meeting at 4pm Frida"
+qwen3:4b,s4,single,2,True,1,45.99,8.5,2325,"[{""name"": ""search_notes"", ""args"": {""keyword"": ""meeting""}}]","Okay, let's see. The user asked to search their notes for 'meeting'. I called the search_notes function with the keyword 'meeting', and the response was ""Team meeting at 4pm Friday"".
+
+So I need to pre"
+qwen3:4b,s4,single,3,True,1,37.85,10.3,2325,"[{""name"": ""search_notes"", ""args"": {""keyword"": ""meeting""}}]","Okay, let's see. The user asked to search their notes for 'meeting'. I called the search_notes function with the keyword 'meeting', and the response was ""Team meeting at 4pm Friday"".
+
+So I need to pre"
+qwen3:4b,sel1,selection,1,True,1,48.88,10.8,2325,"[{""name"": ""get_price"", ""args"": {""item"": ""mouse""}}]","Okay, let's see. The user asked, ""How much does a mouse cost?"" I called the get_price function with the item ""mouse"" and the response was 700.
+
+So the answer should be that a mouse costs 700. But wait"
+qwen3:4b,sel1,selection,2,True,1,3327.25,0.2,2325,"[{""name"": ""get_price"", ""args"": {""item"": ""mouse""}}]","Okay, let's see. The user asked how much a mouse costs. I called the get_price function with the item ""mouse"" and the response was 700. So the price is $700.
+
+Wait, the tool response is just 700. The "
+qwen3:4b,sel1,selection,3,True,1,58.26,12.1,2325,"[{""name"": ""get_price"", ""args"": {""item"": ""mouse""}}]","Okay, let's see. The user asked how much a mouse costs. I called the get_price function with the item ""mouse"" and the response was 700. So the price is $700.
+
+Wait, the tool response is just ""700"". I "
+qwen3:4b,sel2,selection,1,True,1,27.64,13.6,2325,"[{""name"": ""search_notes"", ""args"": {""keyword"": ""groceries""}}]","Okay, let's see. The user asked if they have any notes about groceries. I called the search_notes function with the keyword ""groceries"" and got the response ""Buy milk and eggs"". 
+
+So the answer should"
+qwen3:4b,sel2,selection,2,True,1,22.56,14.4,2325,"[{""name"": ""search_notes"", ""args"": {""keyword"": ""groceries""}}]","Okay, let me process this. The user asked if they have any notes about groceries. I called the search_notes function with the keyword ""groceries"". The response from the tool was ""Buy milk and eggs"".
+
+"
+qwen3:4b,sel2,selection,3,True,1,22.46,14.5,2325,"[{""name"": ""search_notes"", ""args"": {""keyword"": ""groceries""}}]","Okay, let me process this. The user asked if they have any notes about groceries. I called the search_notes function with the keyword ""groceries"". The response from the tool was ""Buy milk and eggs"".
+
+"
+qwen3:4b,c1,chain,1,False,4,489.77,8.6,2335,"[{""name"": ""add"", ""args"": {""a"": 10, ""b"": 5}}, {""name"": ""multiply"", ""args"": {""a"": 15, ""b"": 3}}, {""name"": ""add"", ""args"": {""a"": 10, ""b"": 5}}, {""name"": ""multiply"", ""args"": {""a"": 15, ""b"": 3}}]","Okay, let me try to figure out what's going on here. The user asked to add 10 and 5, then multiply the result by 3. The assistant initially made two tool calls: first add(10,5) which returns 15, then "
