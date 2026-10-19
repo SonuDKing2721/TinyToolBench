@@ -1,37 +1,35 @@
 import csv
 import json
-from collections import Counter, defaultdict
+from collections import Counter
 
 from run_benchmark import normalize
 
-with open("tasks.json", encoding="utf-8") as f:
-    tasks = {task["id"]: task for task in json.load(f)}
+INPUT_FILE = "results/results_v3_corrected.csv"
+REASONS_FILE = "results/results_v3_with_reasons.csv"
+BREAKDOWN_FILE = "results/failure_breakdown_v3.csv"
 
-with open("results/results.csv", newline="", encoding="utf-8") as f:
-    all_rows = list(csv.DictReader(f))
+with open("tasks.json", encoding="utf-8-sig") as file:
+    tasks = {task["id"]: task for task in json.load(file)}
 
-# qwen3:1.7b has one extra earlier run; use its latest 36 attempts for fairness.
-by_model = defaultdict(list)
-for row in all_rows:
-    by_model[row["model"]].append(row)
+with open(INPUT_FILE, newline="", encoding="utf-8-sig") as file:
+    rows = list(csv.DictReader(file))
 
-rows = []
-for model, model_rows in by_model.items():
-    if model == "qwen3:1.7b" and len(model_rows) > 36:
-        model_rows = model_rows[-36:]
-    rows.extend(model_rows)
-
+if not rows:
+    raise SystemExit(f"No rows found in {INPUT_FILE}")
 
 def classify(row):
+    status = (row.get("status") or "ok").strip().lower()
+
+    # Keep run errors separate from model mistakes.
+    if status in ("error", "timeout"):
+        return status
+
     if row["passed"].strip().lower() == "true":
         return "pass"
 
-    text = row["final_text"]
-    if text.startswith("ERROR"):
-        return "runtime_error"
-
+    text = row.get("final_text", "")
     expected = tasks[row["task_id"]]["expected_calls"]
-    calls = json.loads(row["calls"] or "[]")
+    calls = json.loads(row.get("calls") or "[]")
 
     if not calls:
         if '"name"' in text or '"arguments"' in text:
@@ -44,20 +42,36 @@ def classify(row):
     if len(calls) != len(expected):
         return "wrong_number_of_calls"
 
-    if sorted(c["name"] for c in calls) != sorted(e["name"] for e in expected):
+    if sorted(call["name"] for call in calls) != sorted(
+        call["name"] for call in expected
+    ):
         return "wrong_tool"
 
-    if sorted(normalize(c) for c in calls) != sorted(normalize(e) for e in expected):
+    actual_shapes = sorted(
+        (call["name"], tuple(sorted(call["args"].keys())))
+        for call in calls
+    )
+    expected_shapes = sorted(
+        (call["name"], tuple(sorted(call["args"].keys())))
+        for call in expected
+    )
+
+    if actual_shapes != expected_shapes:
+        return "bad_schema"
+
+    if sorted(normalize(call) for call in calls) != sorted(
+        normalize(call) for call in expected
+    ):
         return "wrong_arguments"
 
     return "wrong_final_answer"
 
 
-breakdown = Counter()
+counts = Counter()
+fields = list(rows[0].keys()) + ["reason"]
 
-with open("results/results_with_reasons.csv", "w", newline="", encoding="utf-8") as f:
-    fields = list(rows[0].keys()) + ["reason"]
-    writer = csv.DictWriter(f, fieldnames=fields)
+with open(REASONS_FILE, "w", newline="", encoding="utf-8") as file:
+    writer = csv.DictWriter(file, fieldnames=fields)
     writer.writeheader()
 
     for row in rows:
@@ -65,15 +79,14 @@ with open("results/results_with_reasons.csv", "w", newline="", encoding="utf-8")
         writer.writerow({**row, "reason": reason})
 
         if reason != "pass":
-            task_type = tasks[row["task_id"]]["type"]
-            breakdown[(row["model"], task_type, reason)] += 1
+            counts[(row["model"], tasks[row["task_id"]]["type"], reason)] += 1
 
-with open("results/failure_breakdown.csv", "w", newline="", encoding="utf-8") as f:
-    writer = csv.writer(f)
+with open(BREAKDOWN_FILE, "w", newline="", encoding="utf-8") as file:
+    writer = csv.writer(file)
     writer.writerow(["model", "task_type", "reason", "count"])
 
-    for (model, task_type, reason), count in sorted(breakdown.items()):
+    for (model, task_type, reason), count in sorted(counts.items()):
         writer.writerow([model, task_type, reason, count])
 
-print("Created results/results_with_reasons.csv")
-print("Created results/failure_breakdown.csv")
+print(f"Created {REASONS_FILE}")
+print(f"Created {BREAKDOWN_FILE}")

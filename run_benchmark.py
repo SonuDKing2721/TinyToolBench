@@ -11,7 +11,9 @@ from tools import TOOL_FUNCS, TOOL_SCHEMAS
 MODELS = ["qwen3:1.7b", "qwen3:4b", "qwen2.5-coder:7b", "qwen3:8b"]
 RUNS = 3
 MAX_TURNS = 5
-OUT_FILE = "results/results_v2_resume.csv"
+
+SOURCE_FILE = "results/results_v2_resume.csv"
+OUT_FILE = "results/results_v3_resume.csv"
 
 FIELDS = [
     "model",
@@ -25,6 +27,8 @@ FIELDS = [
     "vram_mb",
     "calls",
     "final_text",
+    "status",
+    "error",
 ]
 
 
@@ -75,7 +79,6 @@ def run_task(model, task):
             final_text = message.content or ""
             break
 
-        # Keep the model's tool request in the conversation history.
         messages.append(message)
 
         for tool_call in message.tool_calls:
@@ -97,7 +100,6 @@ def run_task(model, task):
             except Exception as error:
                 result = f"error: {error}"
 
-            # Give the tool result back to the model.
             messages.append({
                 "role": "tool",
                 "tool_name": name,
@@ -122,14 +124,12 @@ def normalize(call):
     arguments = call["args"]
 
     if name in ("add", "multiply"):
-        # Their math is unchanged if the two values are swapped.
         keys = ",".join(sorted(arguments.keys()))
         values = ",".join(
             sorted(str(value).lower() for value in arguments.values())
         )
         return f"{name}:{keys}:{values}"
 
-    # For lookup tools, both the argument names and values must match.
     return f"{name}:{json.dumps(arguments, sort_keys=True)}"
 
 
@@ -143,7 +143,7 @@ def score(task, calls_made, final_text):
         return False
 
     if "expected_answer" in task:
-        expected_answer = task["expected_answer"]
+        expected_answer = str(task["expected_answer"])
         answer_to_check = final_text.replace(",", "")
 
         if expected_answer not in answer_to_check:
@@ -152,40 +152,116 @@ def score(task, calls_made, final_text):
     return True
 
 
+def row_key(row):
+    """Identify one model/task/run combination."""
+    return (
+        str(row.get("model", "")),
+        str(row.get("task_id", "")),
+        str(row.get("run", "")),
+    )
+
+
+def create_output_from_old_results():
+    """Copy old results into the new CSV and add status columns."""
+    previous_rows = []
+
+    if os.path.exists(SOURCE_FILE):
+        with open(SOURCE_FILE, newline="", encoding="utf-8") as old_file:
+            previous_rows = list(csv.DictReader(old_file))
+
+    existing_runs = set()
+
+    with open(OUT_FILE, "w", newline="", encoding="utf-8") as new_file:
+        writer = csv.DictWriter(new_file, fieldnames=FIELDS)
+        writer.writeheader()
+
+        for old_row in previous_rows:
+            key = row_key(old_row)
+
+            if key in existing_runs:
+                continue
+
+            old_text = old_row.get("final_text", "")
+            old_status = "error" if old_text.startswith("ERROR:") else "ok"
+
+            migrated_row = {
+                field: old_row.get(field, "")
+                for field in FIELDS
+            }
+            migrated_row["status"] = old_status
+            migrated_row["error"] = (
+                old_text if old_status == "error" else ""
+            )
+
+            writer.writerow(migrated_row)
+            existing_runs.add(key)
+
+    print(f"Copied {len(existing_runs)} old rows into {OUT_FILE}.")
+    return existing_runs
+
+
 def main():
     with open("tasks.json", encoding="utf-8") as file:
         tasks = json.load(file)
 
-    # A model name after the command runs only that model.
-    # With no model name, the MODELS list above is used.
     models = sys.argv[1:] or MODELS
-
     os.makedirs("results", exist_ok=True)
-    new_file = (
-        not os.path.exists(OUT_FILE)
-        or os.path.getsize(OUT_FILE) == 0
-    )
+
+    if not os.path.exists(OUT_FILE) or os.path.getsize(OUT_FILE) == 0:
+        existing_runs = create_output_from_old_results()
+    else:
+        with open(OUT_FILE, newline="", encoding="utf-8") as file:
+            saved_rows = list(csv.DictReader(file))
+
+        if not saved_rows:
+            existing_runs = create_output_from_old_results()
+        else:
+            existing_runs = {row_key(row) for row in saved_rows}
+            print(f"Found {len(existing_runs)} saved rows in {OUT_FILE}.")
 
     with open(OUT_FILE, "a", newline="", encoding="utf-8") as file:
         writer = csv.DictWriter(file, fieldnames=FIELDS)
 
-        if new_file:
-            writer.writeheader()
-
         for model in models:
             for task in tasks:
                 for run_number in range(1, RUNS + 1):
+                    key = (model, str(task["id"]), str(run_number))
+
+                    if key in existing_runs:
+                        print(model, task["id"], run_number, "SKIP")
+                        continue
+
+                    run_status = "ok"
+                    error_message = ""
+
                     try:
                         calls, final_text, seconds, tokens_per_second = run_task(
                             model, task
                         )
                         passed = score(task, calls, final_text)
+
+                        if final_text.startswith("ERROR:"):
+                            run_status = "error"
+                            error_message = final_text
+
                     except Exception as error:
                         calls = []
                         final_text = f"ERROR: {error}"
                         seconds = 0
                         tokens_per_second = 0
                         passed = False
+                        error_message = str(error)
+
+                        error_text = error_message.lower()
+                        if "timeout" in error_text or "timed out" in error_text:
+                            run_status = "timeout"
+                        else:
+                            run_status = "error"
+
+                    try:
+                        vram = vram_used_mb()
+                    except Exception:
+                        vram = ""
 
                     writer.writerow({
                         "model": model,
@@ -196,14 +272,23 @@ def main():
                         "n_calls": len(calls),
                         "elapsed_s": round(seconds, 2),
                         "tokens_per_s": round(tokens_per_second, 1),
-                        "vram_mb": vram_used_mb(),
+                        "vram_mb": vram,
                         "calls": json.dumps(calls),
                         "final_text": final_text[:200],
+                        "status": run_status,
+                        "error": error_message,
                     })
                     file.flush()
+                    existing_runs.add(key)
 
-                    status = "PASS" if passed else "FAIL"
-                    print(model, task["id"], run_number, status)
+                    result = "PASS" if passed else "FAIL"
+                    print(
+                        model,
+                        task["id"],
+                        run_number,
+                        result,
+                        f"({run_status})",
+                    )
 
 
 if __name__ == "__main__":

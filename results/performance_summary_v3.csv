@@ -1,0 +1,5 @@
+model,attempt_passed,attempt_total,attempt_pass_rate_pct,tasks_passed,task_total,task_pass_rate_pct,wilson_95_low_pct,wilson_95_high_pct,average_tokens_per_s,peak_vram_above_idle_mb
+qwen3:4b,64,90,71.1,21,30,70.0,52.1,83.3,13.4,2335
+qwen3:8b,57,90,63.3,19,30,63.3,45.5,78.1,4.5,2335
+qwen3:1.7b,36,90,40.0,12,30,40.0,24.6,57.7,78.0,1727
+qwen2.5-coder:7b,15,90,16.7,5,30,16.7,7.3,33.6,5.1,2265
