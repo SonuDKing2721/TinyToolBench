@@ -4,9 +4,9 @@ from collections import Counter
 
 from run_benchmark import normalize
 
-INPUT_FILE = "results/results_v3_corrected.csv"
-REASONS_FILE = "results/results_v3_with_reasons.csv"
-BREAKDOWN_FILE = "results/failure_breakdown_v3.csv"
+INPUT_FILE = "results/results_v4.csv"
+REASONS_FILE = "results/results_v4_with_reasons.csv"
+BREAKDOWN_FILE = "results/failure_breakdown_v4.csv"
 
 with open("tasks.json", encoding="utf-8-sig") as file:
     tasks = {task["id"]: task for task in json.load(file)}
@@ -59,10 +59,12 @@ def classify(row):
     if actual_shapes != expected_shapes:
         return "bad_schema"
 
-    if sorted(normalize(call) for call in calls) != sorted(
-        normalize(call) for call in expected
-    ):
+    actual_normalized = [normalize(call) for call in calls]
+    expected_normalized = [normalize(call) for call in expected]
+    if sorted(actual_normalized) != sorted(expected_normalized):
         return "wrong_arguments"
+    if tasks[row["task_id"]].get("ordered") and actual_normalized != expected_normalized:
+        return "wrong_call_order"
 
     return "wrong_final_answer"
 

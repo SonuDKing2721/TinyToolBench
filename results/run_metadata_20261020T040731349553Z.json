@@ -1,0 +1,43 @@
+{
+  "session_id": "20261020T040731349553Z",
+  "started_at_utc": "2026-10-20T04:07:31.349553+00:00",
+  "command": [
+    "C:\\benchmark\\.venv-msys\\bin\\python.exe",
+    "run_benchmark.py"
+  ],
+  "python_version": "3.14.3",
+  "python_executable": "C:\\benchmark\\.venv-msys\\bin\\python.exe",
+  "platform": "Windows-11-10.0.26300-SP0",
+  "ollama_cli_version": "ollama version is 0.40.3",
+  "ollama_python_client_version": "0.6.3",
+  "temperature": 0,
+  "qwen3_think": false,
+  "runs_per_task": 3,
+  "max_turns": 5,
+  "idle_gpu_memory_mb": 2337,
+  "result_file": "results/results_v4.csv",
+  "tasks_sha256": "3364166529d5d30330e8dda01b799d18d67959763945689d62767abc66a1ed9d",
+  "tools_sha256": "fdca250b845aab6626c6a677410f440f2ae2fb1f55758755908c46c071eb2536",
+  "models": {
+    "qwen3:1.7b": {
+      "family": "qwen3",
+      "parameter_size": "2.0B",
+      "quantization_level": "Q4_K_M"
+    },
+    "qwen3:4b": {
+      "family": "qwen3",
+      "parameter_size": "4.0B",
+      "quantization_level": "Q4_K_M"
+    },
+    "qwen2.5-coder:7b": {
+      "family": "qwen2",
+      "parameter_size": "7.6B",
+      "quantization_level": "Q4_K_M"
+    },
+    "qwen3:8b": {
+      "family": "qwen3",
+      "parameter_size": "8.2B",
+      "quantization_level": "Q4_K_M"
+    }
+  }
+}

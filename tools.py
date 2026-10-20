@@ -13,7 +13,8 @@ NOTES = {
     "travel": "Trip to Chennai is planned for 12 November",
     "project": "Benchmark report draft is due Friday",
     "appointment": "Dentist appointment is at 11am Tuesday",
-    "shelves": "Each shelf holds 8 books and there are 6 shelves"
+    "shelves": "Each shelf holds 8 books and there are 6 shelves",
+    "football": "My GOAT in football is Lionel Messi",
 }
 
 def add(a, b):

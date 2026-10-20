@@ -1,0 +1,5 @@
+model,attempt_passed,attempt_total,attempt_pass_rate_pct,tasks_passed,task_total,task_pass_rate_pct,wilson_95_low_pct,wilson_95_high_pct,average_tokens_per_s,max_post_task_gpu_memory_mb
+qwen3:8b,60,90,66.7,20,30,66.7,48.8,80.8,2.9,2335
+qwen3:4b,51,90,56.7,17,30,56.7,39.2,72.6,12.1,2337
+qwen3:1.7b,33,90,36.7,11,30,36.7,21.9,54.5,77.1,1727
+qwen2.5-coder:7b,6,90,6.7,2,30,6.7,1.8,21.3,5.0,2265

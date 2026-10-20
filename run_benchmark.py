@@ -1,9 +1,15 @@
 import csv
+import hashlib
+import importlib.metadata
 import json
 import os
+import platform
+import re
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 
 import ollama
 from tools import TOOL_FUNCS, TOOL_SCHEMAS
@@ -12,8 +18,8 @@ MODELS = ["qwen3:1.7b", "qwen3:4b", "qwen2.5-coder:7b", "qwen3:8b"]
 RUNS = 3
 MAX_TURNS = 5
 
-SOURCE_FILE = "results/results_v2_resume.csv"
-OUT_FILE = "results/results_v3_resume.csv"
+SOURCE_FILE = None
+OUT_FILE = "results/results_v4.csv"
 
 FIELDS = [
     "model",
@@ -24,16 +30,90 @@ FIELDS = [
     "n_calls",
     "elapsed_s",
     "tokens_per_s",
-    "vram_mb",
+    "post_task_vram_mb",
     "calls",
     "final_text",
     "status",
     "error",
+    "session_id",
 ]
 
+TASK_TYPES = {"single", "selection", "chain", "no_tool", "robustness"}
 
-def vram_used_mb():
-    """Return the GPU memory currently in use, in MB."""
+
+def validate_tasks(tasks):
+    """Reject malformed task definitions before starting model inference."""
+    if not isinstance(tasks, list) or not tasks:
+        raise ValueError("tasks.json must contain a non-empty list")
+
+    schemas = {
+        schema["function"]["name"]: schema["function"]["parameters"]
+        for schema in TOOL_SCHEMAS
+    }
+    seen_ids = set()
+
+    for index, task in enumerate(tasks):
+        label = f"task at index {index}"
+        if not isinstance(task, dict):
+            raise ValueError(f"{label} must be an object")
+        task_id = task.get("id")
+        if not isinstance(task_id, str) or not task_id.strip():
+            raise ValueError(f"{label} must have a non-empty string id")
+        if task_id in seen_ids:
+            raise ValueError(f"duplicate task id: {task_id}")
+        seen_ids.add(task_id)
+
+        if task.get("type") not in TASK_TYPES:
+            raise ValueError(f"{task_id}: unknown task type {task.get('type')!r}")
+        if not isinstance(task.get("prompt"), str) or not task["prompt"].strip():
+            raise ValueError(f"{task_id}: prompt must be a non-empty string")
+        if not isinstance(task.get("expected_calls"), list):
+            raise ValueError(f"{task_id}: expected_calls must be a list")
+        if "ordered" in task and not isinstance(task["ordered"], bool):
+            raise ValueError(f"{task_id}: ordered must be a boolean")
+        if "expected_answer" in task and not isinstance(
+            task["expected_answer"], (str, int, float)
+        ):
+            raise ValueError(f"{task_id}: expected_answer must be text or a number")
+
+        for call_index, call in enumerate(task["expected_calls"]):
+            call_label = f"{task_id}: expected call {call_index}"
+            if not isinstance(call, dict):
+                raise ValueError(f"{call_label} must be an object")
+            name = call.get("name")
+            if name not in schemas:
+                raise ValueError(f"{call_label}: unknown tool {name!r}")
+            arguments = call.get("args")
+            if not isinstance(arguments, dict):
+                raise ValueError(f"{call_label}: args must be an object")
+
+            parameters = schemas[name]
+            properties = parameters.get("properties", {})
+            required = parameters.get("required", [])
+            missing = set(required) - arguments.keys()
+            unknown = arguments.keys() - properties.keys()
+            if missing:
+                raise ValueError(f"{call_label}: missing required arguments {sorted(missing)}")
+            if unknown:
+                raise ValueError(f"{call_label}: unknown arguments {sorted(unknown)}")
+
+            for argument_name, value in arguments.items():
+                expected_type = properties[argument_name].get("type")
+                valid = (
+                    type(value) is int
+                    if expected_type == "integer"
+                    else isinstance(value, str)
+                    if expected_type == "string"
+                    else False
+                )
+                if not valid:
+                    raise ValueError(
+                        f"{call_label}: argument {argument_name!r} must be {expected_type}"
+                    )
+
+
+def post_task_vram_mb():
+    """Sample current GPU memory after a task; this is not a true peak."""
     result = subprocess.run(
         [
             "nvidia-smi",
@@ -45,6 +125,81 @@ def vram_used_mb():
         check=True,
     )
     return int(result.stdout.strip().splitlines()[0])
+
+
+def ollama_cli_version():
+    """Return the version reported by the installed Ollama CLI, if available."""
+    try:
+        result = subprocess.run(
+            ["ollama", "--version"], capture_output=True, text=True,
+            check=False, timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return (result.stdout or result.stderr).strip() or None
+
+
+def ollama_python_client_version():
+    try:
+        return importlib.metadata.version("ollama")
+    except importlib.metadata.PackageNotFoundError:
+        return None
+
+
+def file_sha256(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as source:
+        for block in iter(lambda: source.read(65536), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def write_run_metadata(models):
+    """Write a sidecar containing the settings and model tags for this run."""
+    os.makedirs("results", exist_ok=True)
+    timestamp = datetime.now(timezone.utc)
+    session_id = timestamp.strftime("%Y%m%dT%H%M%S%fZ")
+    model_metadata = {}
+    for model in models:
+        try:
+            details = ollama.show(model).details
+            model_metadata[model] = {
+                "family": details.family,
+                "parameter_size": details.parameter_size,
+                "quantization_level": details.quantization_level,
+            }
+        except Exception as error:
+            model_metadata[model] = {"metadata_error": str(error)}
+
+    try:
+        idle_gpu_memory_mb = post_task_vram_mb()
+    except Exception:
+        idle_gpu_memory_mb = None
+
+    metadata = {
+        "session_id": session_id,
+        "started_at_utc": timestamp.isoformat(),
+        "command": [sys.executable, *sys.argv],
+        "python_version": platform.python_version(),
+        "python_executable": sys.executable,
+        "platform": platform.platform(),
+        "ollama_cli_version": ollama_cli_version(),
+        "ollama_python_client_version": ollama_python_client_version(),
+        "temperature": 0,
+        "qwen3_think": False,
+        "runs_per_task": RUNS,
+        "max_turns": MAX_TURNS,
+        "idle_gpu_memory_mb": idle_gpu_memory_mb,
+        "result_file": OUT_FILE,
+        "tasks_sha256": file_sha256("tasks.json"),
+        "tools_sha256": file_sha256("tools.py"),
+        "models": model_metadata,
+    }
+    path = os.path.join("results", f"run_metadata_{session_id}.json")
+    with open(path, "w", encoding="utf-8") as file:
+        json.dump(metadata, file, indent=2)
+        file.write("\n")
+    return session_id, path
 
 
 def chat_kwargs(model):
@@ -133,20 +288,53 @@ def normalize(call):
     return f"{name}:{json.dumps(arguments, sort_keys=True)}"
 
 
+def answer_matches(expected, actual):
+    """Match a complete number or a normalized sequence of text words."""
+    expected = str(expected).strip()
+    number_pattern = r"[+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?"
+
+    if re.fullmatch(number_pattern, expected):
+        expected_number = Decimal(expected.replace(",", ""))
+        actual_numbers = re.findall(
+            rf"(?<![\w.])({number_pattern})(?!\w|\.\d)", actual
+        )
+        for number in actual_numbers:
+            try:
+                if Decimal(number.replace(",", "")) == expected_number:
+                    return True
+            except InvalidOperation:
+                continue
+        return False
+
+    expected_words = re.findall(r"\w+", expected.casefold())
+    actual_words = re.findall(r"\w+", actual.casefold())
+    if not expected_words:
+        return False
+
+    width = len(expected_words)
+    return any(
+        actual_words[index:index + width] == expected_words
+        for index in range(len(actual_words) - width + 1)
+    )
+
+
 def score(task, calls_made, final_text):
     expected_calls = task["expected_calls"]
 
-    actual = sorted(normalize(call) for call in calls_made)
-    expected = sorted(normalize(call) for call in expected_calls)
+    actual = [normalize(call) for call in calls_made]
+    expected = [normalize(call) for call in expected_calls]
 
-    if actual != expected:
+    if task.get("ordered", False):
+        if actual != expected:
+            return False
+    elif sorted(actual) != sorted(expected):
+        return False
+
+    if task.get("type") == "no_tool" and not final_text.strip():
         return False
 
     if "expected_answer" in task:
-        expected_answer = str(task["expected_answer"])
-        answer_to_check = final_text.replace(",", "")
-
-        if expected_answer not in answer_to_check:
+        if not answer_matches(task["expected_answer"], final_text):
             return False
 
     return True
@@ -161,13 +349,18 @@ def row_key(row):
     )
 
 
+def read_csv_rows(path):
+    """Read benchmark rows, stripping a UTF-8 BOM if the file has one."""
+    with open(path, newline="", encoding="utf-8-sig") as file:
+        return list(csv.DictReader(file))
+
+
 def create_output_from_old_results():
-    """Copy old results into the new CSV and add status columns."""
+    """Initialize the output CSV, optionally migrating a configured source."""
     previous_rows = []
 
-    if os.path.exists(SOURCE_FILE):
-        with open(SOURCE_FILE, newline="", encoding="utf-8") as old_file:
-            previous_rows = list(csv.DictReader(old_file))
+    if SOURCE_FILE and os.path.exists(SOURCE_FILE):
+        previous_rows = read_csv_rows(SOURCE_FILE)
 
     existing_runs = set()
 
@@ -203,15 +396,17 @@ def create_output_from_old_results():
 def main():
     with open("tasks.json", encoding="utf-8") as file:
         tasks = json.load(file)
+    validate_tasks(tasks)
 
     models = sys.argv[1:] or MODELS
     os.makedirs("results", exist_ok=True)
+    session_id, metadata_path = write_run_metadata(models)
+    print(f"Run metadata saved to {metadata_path}")
 
     if not os.path.exists(OUT_FILE) or os.path.getsize(OUT_FILE) == 0:
         existing_runs = create_output_from_old_results()
     else:
-        with open(OUT_FILE, newline="", encoding="utf-8") as file:
-            saved_rows = list(csv.DictReader(file))
+        saved_rows = read_csv_rows(OUT_FILE)
 
         if not saved_rows:
             existing_runs = create_output_from_old_results()
@@ -259,7 +454,7 @@ def main():
                             run_status = "error"
 
                     try:
-                        vram = vram_used_mb()
+                        vram = post_task_vram_mb()
                     except Exception:
                         vram = ""
 
@@ -272,11 +467,12 @@ def main():
                         "n_calls": len(calls),
                         "elapsed_s": round(seconds, 2),
                         "tokens_per_s": round(tokens_per_second, 1),
-                        "vram_mb": vram,
+                        "post_task_vram_mb": vram,
                         "calls": json.dumps(calls),
-                        "final_text": final_text[:200],
+                        "final_text": final_text,
                         "status": run_status,
                         "error": error_message,
+                        "session_id": session_id,
                     })
                     file.flush()
                     existing_runs.add(key)

@@ -11,21 +11,22 @@
    "expected_calls": [{"name": "get_price", "args": {"item": "mouse"}}], "expected_answer": "700"},
   {"id": "sel2", "type": "selection", "prompt": "Do I have any notes about groceries?",
    "expected_calls": [{"name": "search_notes", "args": {"keyword": "groceries"}}]},
-  {"id": "c1", "type": "chain", "prompt": "Add 10 and 5, then multiply the result by 3.",
+  {"id": "c1", "type": "chain", "ordered": true, "prompt": "Add 10 and 5, then multiply the result by 3.",
    "expected_calls": [{"name": "add", "args": {"a": 10, "b": 5}}, {"name": "multiply", "args": {"a": 15, "b": 3}}],
    "expected_answer": "45"},
-  {"id": "c2", "type": "chain", "prompt": "What is the price of a keyboard plus the price of a mouse?",
+  {"id": "c2", "type": "chain", "ordered": true, "prompt": "First look up the keyboard price, then look up the mouse price, then add the two prices.",
    "expected_calls": [{"name": "get_price", "args": {"item": "keyboard"}}, {"name": "get_price", "args": {"item": "mouse"}}, {"name": "add", "args": {"a": 1500, "b": 700}}],
    "expected_answer": "2200"},
-  {"id": "c3", "type": "chain", "prompt": "Find the price of a monitor and multiply it by 2.",
+  {"id": "c3", "type": "chain", "ordered": true, "prompt": "Find the price of a monitor and multiply it by 2.",
    "expected_calls": [{"name": "get_price", "args": {"item": "monitor"}}, {"name": "multiply", "args": {"a": 9000, "b": 2}}],
    "expected_answer": "18000"},
-  {"id": "n1", "type": "no_tool", "prompt": "What is the capital of France?", "expected_calls": []},
-  {"id": "n2", "type": "no_tool", "prompt": "Say hello in one sentence.", "expected_calls": []},
+  {"id": "n1", "type": "no_tool", "prompt": "What is the capital of France?", "expected_calls": [], "expected_answer": "Paris"},
+  {"id": "n2", "type": "no_tool", "prompt": "Say hello in one sentence.", "expected_calls": [], "expected_answer": "Hello"},
   {"id": "n3", "type": "no_tool", "prompt": "Add the word 'apple' to my notes.", "expected_calls": []},
   {
     "id": "c4",
     "type": "chain",
+    "ordered": true,
     "prompt": "Add 2 and 3, multiply the result by 4, then add 10.",
     "expected_calls": [
       {"name": "add", "args": {"a": 2, "b": 3}},
@@ -37,6 +38,7 @@
   {
     "id": "c5",
     "type": "chain",
+    "ordered": true,
     "prompt": "What is 7 times 8 plus 6?",
     "expected_calls": [
       {"name": "multiply", "args": {"a": 7, "b": 8}},
@@ -65,7 +67,8 @@
     "id": "n4",
     "type": "no_tool",
     "prompt": "What is 2 plus 2? Answer from your head; do not use any tools.",
-    "expected_calls": []
+    "expected_calls": [],
+    "expected_answer": "4"
   },
   {
     "id": "n5",
@@ -101,7 +104,8 @@
 {
   "id": "x4",
   "type": "chain",
-  "prompt": "What is the price of a webcam plus the price of a desk lamp?",
+  "ordered": true,
+  "prompt": "First look up the webcam price, then look up the desk lamp price, then add the two prices.",
   "expected_calls": [
     {"name": "get_price", "args": {"item": "webcam"}},
     {"name": "get_price", "args": {"item": "desk lamp"}},
@@ -112,6 +116,7 @@
 {
   "id": "x5",
   "type": "chain",
+  "ordered": true,
   "prompt": "Add 12 and 5, multiply the result by 9, then add 8.",
   "expected_calls": [
     {"name": "add", "args": {"a": 12, "b": 5}},
@@ -130,17 +135,19 @@
 },
 {
   "id": "x7",
-  "type": "selection",
-  "prompt": "If each shelf holds 8 books and I have 6 shelves, how many books is that?.",
+  "type": "chain",
+  "ordered": true,
+  "prompt": "Search my notes for the shelf information, then calculate how many books there are in total.",
   "expected_calls": [
     {"name": "search_notes", "args": {"keyword": "shelves"}},
-    {"name":"multiply","args":{"a":"8","b":"6"}}
+    {"name": "multiply", "args": {"a": 8, "b": 6}}
   ],
   "expected_answer": "48"
 },
 {
   "id": "x8",
   "type": "chain",
+  "ordered": true,
   "prompt": "What would headphones cost, plus 600 for shipping?",
   "expected_calls": [
     {"name": "get_price", "args": {"item": "headphones"}},
@@ -172,9 +179,11 @@
 },
 {
   "id": "x12",
-  "type":"no_tool",
-  "prompt": "Who is the GOAT in football?",
-  "expected_calls": [],
+  "type": "selection",
+  "prompt": "According to my football note, who is my GOAT?",
+  "expected_calls": [
+    {"name": "search_notes", "args": {"keyword": "football"}}
+  ],
   "expected_answer": "Lionel Messi"
 }
 ]

@@ -1,7 +1,7 @@
 import csv
 from collections import defaultdict
 
-INPUT_FILE = "results/results_v3_corrected.csv"
+INPUT_FILE = "results/results_v4.csv"
 
 passed = defaultdict(int)
 total = defaultdict(int)
@@ -24,5 +24,3 @@ for model, task_type in sorted(total):
     attempts = total[(model, task_type)]
     rate = count / attempts * 100
     print(f"{model:<20} {task_type:<12} {count:>4}/{attempts:<3} {rate:>7.1f}%")
-
-    

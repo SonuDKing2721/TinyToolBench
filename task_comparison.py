@@ -4,7 +4,7 @@ import math
 from collections import defaultdict
 from itertools import combinations
 
-INPUT_FILE = "results/results_v3_corrected.csv"
+INPUT_FILE = "results/results_v4.csv"
 RUNS_PER_TASK = 3
 
 
@@ -54,7 +54,7 @@ for model in models:
     passed = sum(task_results[model].values())
     total = len(task_results[model])
     low, high = wilson_interval(passed, total)
-    print(f"{model}: {passed}/{total} tasks, 95% Wilson interval {low:.1f}%–{high:.1f}%")
+    print(f"{model}: {passed}/{total} tasks, 95% Wilson interval {low:.1f}%-{high:.1f}%")
 
 print("\nPaired comparison (same tasks; majority result per task)")
 for first, second in combinations(models, 2):

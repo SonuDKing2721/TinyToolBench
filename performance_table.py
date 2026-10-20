@@ -3,9 +3,8 @@ import json
 import math
 from collections import defaultdict
 
-INPUT_FILE = "results/results_v3_corrected.csv"
-OUTPUT_FILE = "results/performance_summary_v3.csv"
-IDLE_VRAM_MB = 0  # Your idle nvidia-smi reading was 0 MiB.
+INPUT_FILE = "results/results_v4.csv"
+OUTPUT_FILE = "results/performance_summary_v4.csv"
 RUNS_PER_TASK = 3
 
 
@@ -64,11 +63,11 @@ for model, rows in by_model.items():
 
     speeds = [float(row["tokens_per_s"]) for row in rows]
     vram_values = [
-        float(row["vram_mb"])
+        float(row["post_task_vram_mb"])
         for row in rows
-        if row.get("vram_mb", "").strip()
+        if row.get("post_task_vram_mb", "").strip()
     ]
-    peak_vram = max(vram_values) - IDLE_VRAM_MB if vram_values else 0
+    max_post_task_vram = max(vram_values) if vram_values else 0
 
     summary.append({
         "model": model,
@@ -83,14 +82,14 @@ for model, rows in by_model.items():
         "wilson_95_low_pct": round(ci_low, 1),
         "wilson_95_high_pct": round(ci_high, 1),
         "average_tokens_per_s": round(sum(speeds) / len(speeds), 1),
-        "peak_vram_above_idle_mb": round(peak_vram),
+        "max_post_task_gpu_memory_mb": round(max_post_task_vram),
     })
 
 summary.sort(key=lambda item: item["task_pass_rate_pct"], reverse=True)
 
 print(
     f"{'Model':<20} {'Attempts':>12} {'Tasks':>10} "
-    f"{'Wilson 95%':>17} {'Tok/s':>8} {'GPU MB':>8}"
+        f"{'Wilson 95%':>17} {'Tok/s':>8} {'Post-task MB':>13}"
 )
 print("-" * 82)
 
@@ -107,7 +106,7 @@ for item in summary:
         f"{tasks:>10} "
         f"{interval:>17} "
         f"{item['average_tokens_per_s']:>8.1f} "
-        f"{item['peak_vram_above_idle_mb']:>8}"
+        f"{item['max_post_task_gpu_memory_mb']:>13}"
     )
 
 with open(OUTPUT_FILE, "w", newline="", encoding="utf-8") as file:
