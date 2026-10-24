@@ -116,10 +116,15 @@ TinyToolBench differs in its small fixed set of local tools, deterministic check
    ollama pull qwen3:8b
    ollama pull qwen2.5-coder:7b
    ```
-2. Create/activate the project virtual environment and install dependencies:
+2. Create/activate the project virtual environment and install the benchmark dependency:
    ```powershell
    python -m pip install -r requirements.txt
    ```
+   To regenerate the charts, install the optional plotting dependency too:
+   ```powershell
+   python -m pip install -r requirements-visualization.txt
+   ```
+   Use standard Windows CPython for chart generation; the MSYS Python used for this run may not have a matching Matplotlib wheel and can try to build it from source.
 3. Run all models, or pass model tags to run only selected models:
    ```powershell
    python run_benchmark.py
@@ -135,7 +140,7 @@ TinyToolBench differs in its small fixed set of local tools, deterministic check
    python scripts/category_table.py
    python scripts/task_comparison.py
    ```
-   These create the v4 summary CSVs and charts under `results/`. Run `python run_benchmark.py` first; the analysis scripts intentionally do not fall back to historical data.
+   These create the v4 summary CSVs and charts under `results/`. The chart script requires `requirements-visualization.txt`. Run `python run_benchmark.py` first; the analysis scripts intentionally do not fall back to historical data.
 
 ## License
 
