@@ -116,7 +116,7 @@ TinyToolBench differs in its small fixed set of local tools, deterministic check
    ollama pull qwen3:8b
    ollama pull qwen2.5-coder:7b
    ```
-2. Create/activate the project virtual environment and install the benchmark dependency:
+2. Use standard Windows CPython 3.11 or newer (not the MSYS Python distribution), create/activate a virtual environment, and install the benchmark dependency. The Ollama client depends on `pydantic-core`, which may try to build from source under MSYS Python:
    ```powershell
    python -m pip install -r requirements.txt
    ```
