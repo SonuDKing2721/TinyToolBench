@@ -67,9 +67,10 @@ Each task passes when at least 2 of its 3 runs pass. These are the task-level re
 
 ### Findings
 
-- **Chains are the clearest weakness:** the 1.7B and coder models had 0/27 passing chain attempts; the 4B had 6/27 and the 8B had 15/27.
+- **Within Qwen3, chain performance rose with model size in this run:** the 1.7B passed 0/27 chain attempts, the 4B passed 6/27, and the 8B passed 15/27. These are results on this small task set, not a general scaling law.
+- **The chain failures had different patterns:** for the 1.7B, the most common recorded reason was wrong arguments (15/27), followed by no tool call (10/27). For the 4B, the most common reason was tool-call-shaped text instead of a structured call (11/27), followed by the wrong number of calls (10/27). See `results/failure_breakdown_v4.csv` for all categories.
 - **The 8B's lead over the 4B is not conclusive:** 20 vs. 17 tasks passed, with overlapping Wilson intervals and 25 ties in the paired task comparison.
-- **The coder score needs a caveat:** it wrote tool-call-shaped text instead of structured calls in 84/90 runs, so its 2/30 result mainly reflects compatibility with Ollama's structured tool-call interface, not general tool-use ability.
+- **The coder score needs a caveat:** it wrote tool-call-shaped text instead of structured calls in 84/90 runs. This likely reflects compatibility with Ollama's structured tool-call interface, but that explanation was not tested independently; 2/30 describes performance through this interface, not general tool-use ability.
 
 ![Average generation speed by model](results/speed_v4.png)
 
@@ -89,6 +90,8 @@ The CSV has 360 unique model/task/run records, all with `status=ok`. The full an
 ## Measurement notes
 
 GPU memory is sampled after each task with `nvidia-smi`. The v4 charts and summary report the maximum raw post-task sample; this is **not** continuous peak VRAM monitoring and can miss higher usage during inference. The completed v4 data spans two resumed sessions with different idle readings, so raw post-task memory is shown instead of subtracting one baseline from all rows. CPU/GPU placement is a runtime snapshot, not a per-task measurement.
+
+Speed is specific to this machine and runtime. The 4 GB GPU constrains placement of larger models, and CPU offload can substantially reduce throughput; in particular, the 8B result of 2.9 tokens/s versus 77.1 for the 1.7B should not be read as an intrinsic model-speed or model-quality comparison. Per-model CPU/GPU placement was not recorded for each v4 attempt.
 
 ## Limitations
 
@@ -116,7 +119,7 @@ TinyToolBench differs in its small fixed set of local tools, deterministic check
    ollama pull qwen3:8b
    ollama pull qwen2.5-coder:7b
    ```
-2. Use standard Windows CPython 3.11 or newer (not the MSYS Python distribution), create/activate a virtual environment, and install the benchmark dependency. The Ollama client depends on `pydantic-core`, which may try to build from source under MSYS Python:
+2. The v4 benchmark results above were run with MSYS Python 3.14.3. A separate fresh-clone smoke test passed on standard Windows CPython 3.11; it checked dependency installation, the test suite, and one model on three tasks, not a reproduction of all v4 results. For a new setup, use standard Windows CPython 3.11 or newer (not the MSYS Python distribution), create/activate a virtual environment, and install the benchmark dependency. The Ollama client depends on `pydantic-core`, which may try to build from source under MSYS Python:
    ```powershell
    python -m pip install -r requirements.txt
    ```
