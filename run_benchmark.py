@@ -438,6 +438,7 @@ def main():
                         if final_text.startswith("ERROR:"):
                             run_status = "error"
                             error_message = final_text
+                            passed = False
 
                     except Exception as error:
                         calls = []

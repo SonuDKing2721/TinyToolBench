@@ -74,6 +74,45 @@ class BenchmarkTests(unittest.TestCase):
         self.assertEqual(rows[0]["final_text"], final_text)
         self.assertEqual(rows[0]["session_id"], "test-session")
 
+    def test_error_result_is_not_recorded_as_pass(self):
+        with tempfile.TemporaryDirectory() as directory:
+            previous_directory = os.getcwd()
+            try:
+                os.chdir(directory)
+                Path("tasks.json").write_text(
+                    json.dumps([{
+                        "id": "no-tool-error",
+                        "type": "no_tool",
+                        "prompt": "Give a simple reply.",
+                        "expected_calls": [],
+                    }]),
+                    encoding="utf-8",
+                )
+                with (
+                    patch.object(run_benchmark, "SOURCE_FILE", None),
+                    patch.object(run_benchmark, "OUT_FILE", "results/test.csv"),
+                    patch.object(
+                        run_benchmark,
+                        "run_task",
+                        return_value=([], "ERROR: simulated timeout", 0, 0),
+                    ),
+                    patch.object(run_benchmark, "post_task_vram_mb", return_value=0),
+                    patch.object(
+                        run_benchmark,
+                        "write_run_metadata",
+                        return_value=("test-session", "metadata.json"),
+                    ),
+                    patch.object(sys, "argv", ["run_benchmark.py", "test-model"]),
+                    redirect_stdout(io.StringIO()),
+                ):
+                    run_benchmark.main()
+                rows = read_csv_rows("results/test.csv")
+            finally:
+                os.chdir(previous_directory)
+
+        self.assertEqual(rows[0]["status"], "error")
+        self.assertEqual(rows[0]["passed"], "False")
+
     def test_run_metadata_records_command_versions_and_model_quantization(self):
         model_details = SimpleNamespace(
             family="qwen3",
